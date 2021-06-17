@@ -10,12 +10,14 @@ using StackExchange.Redis;
 namespace FunTest1.Controllers
 {
     [Route("api/[controller]/[action]")]
+    [ApiController]
     public class HomeController : ControllerBase
     {
+        private string guid = Guid.NewGuid().ToString("N");
+
         [HttpGet]
         public ActionResult Index()
         {
-            var guid = Guid.NewGuid().ToString();
             var result = new { code = 200, msg = "", uuid = guid };
             #region  StackExchange.Redis
             try
@@ -30,6 +32,38 @@ namespace FunTest1.Controllers
                 result = new { code = 403, msg = ex.ToString(), uuid = guid };
             }
             #endregion
+
+            return Content(JsonConvert.SerializeObject(result));
+        }
+        [HttpGet]
+        public ActionResult Info()
+        {
+            var result = new { code = 200, msg = "hi,welcome to dynamicl api Info!", uuid = guid };
+
+            return Content(JsonConvert.SerializeObject(result));
+        }
+    }
+
+
+    [Route("api/[controller]")]
+    [ApiController]
+    public class Fun1Controller : ControllerBase
+    {
+        private string guid = Guid.NewGuid().ToString("N");
+
+        // GET: api/fun1/Index
+        [HttpGet("Index")]
+        public ActionResult Index()
+        {
+            var result = new { code = 200, msg = "hi,welcome to dynamicl api!", uuid = guid };
+
+            return Content(JsonConvert.SerializeObject(result));
+        }
+        // GET: api/fun1/Info
+        [HttpGet("Info")]
+        public ActionResult Info()
+        {
+            var result = new { code = 200, msg = "hi,welcome to dynamicl api Info!", uuid = guid };
 
             return Content(JsonConvert.SerializeObject(result));
         }

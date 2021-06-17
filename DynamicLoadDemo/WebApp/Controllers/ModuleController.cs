@@ -24,7 +24,7 @@ namespace WebApp.Controllers
             _myAssemblyConfig = myAssemblyConfig;
             _builders = myAssemblyConfig.mvcbuilders;
         }
-        // GET: api/Enabled
+        // GET: api/Module/Enabled
         [HttpGet("Enabled")]
         public ActionResult Enabled()
         {
@@ -90,7 +90,7 @@ namespace WebApp.Controllers
             return Content(JsonConvert.SerializeObject(result));
         }
 
-        // GET api/Disabled
+        // GET api/Module/Disabled
         [HttpGet("Disabled")]
         public ActionResult Disabled()
         {
