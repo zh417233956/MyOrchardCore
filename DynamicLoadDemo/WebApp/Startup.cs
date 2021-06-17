@@ -30,41 +30,20 @@ namespace WebApp
 
         public IConfiguration Configuration { get; }
 
-        public static IMvcBuilder builders;
-
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddOrchardCore();
 
             //services.AddControllers();
+
+            var builders = services.AddControllers();
+
             //services.AddSingleton<IModuleNamesProvider, DynamicModuleNamesProvider>();
 
-            builders = services.AddControllers();
+            services.AddSingleton(m=>new Controllers.MyAssemblyConfig(builders));
 
-            //builders.ConfigureApplicationPartManager(apm =>
-            //{
-            //    var baseDirectory = AppContext.BaseDirectory;
-
-            //    var location = Path.Combine(baseDirectory, "modules");
-
-            //    if (!Directory.Exists(location))
-            //    {
-            //        return;
-            //    }
-
-            //    foreach (var file in Directory.EnumerateFiles(location))
-            //    {
-            //        var assemblyPath = Path.Combine(location, file);
-            //        //var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
-            //        var mycon = new AssemblyLoadContext("mycon", true);
-            //        var assembly = mycon.LoadFromAssemblyPath(assemblyPath);
-            //        var assemblyPart = new AssemblyPart(assembly);
-            //        apm.ApplicationParts.Add(assemblyPart);
-
-            //    }
-            //});
-
+            //实现控制器的动态管理
             services.AddSingleton<IActionDescriptorChangeProvider>(MyActionDescriptorChangeProvider.Instance);
             services.AddSingleton(MyActionDescriptorChangeProvider.Instance);
         }

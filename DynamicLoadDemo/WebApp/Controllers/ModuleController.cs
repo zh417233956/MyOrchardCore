@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.ApplicationParts;
 using Microsoft.Extensions.DependencyInjection;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,116 +17,147 @@ namespace WebApp.Controllers
     [ApiController]
     public class ModuleController : ControllerBase
     {
-        // GET: api/<ModuleController>
-        [HttpGet]
-        public IEnumerable<string> Get()
+        MyAssemblyConfig _myAssemblyConfig;
+        IMvcBuilder _builders;
+        public ModuleController(MyAssemblyConfig myAssemblyConfig)
         {
-            Startup.builders.ConfigureApplicationPartManager(apm =>
+            _myAssemblyConfig = myAssemblyConfig;
+            _builders = myAssemblyConfig.mvcbuilders;
+        }
+        // GET: api/Enabled
+        [HttpGet("Enabled")]
+        public ActionResult Enabled()
+        {
+            var guid = Guid.NewGuid().ToString();
+            var result = new { code = 200, msg = "", uuid = guid };
+            try
             {
-                var baseDirectory = AppContext.BaseDirectory;
-
-                var location = Path.Combine(baseDirectory, "modules");
-
-                if (Directory.Exists(location))
+                _builders.ConfigureApplicationPartManager(apm =>
                 {
-                    //foreach (var file in Directory.EnumerateFiles(location))
-                    //{
-                    //    var assemblyPath = Path.Combine(location, file);
-                    //    //var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
-                    //    var mycon = new AssemblyLoadContext("mycon", true);                       
-                    //    var assembly = mycon.LoadFromAssemblyPath(assemblyPath);
-                    //    var assemblyPart = new AssemblyPart(assembly);
-                    //    apm.ApplicationParts.Add(assemblyPart);
-                    //    if (MyConfig.assemblys.Exists(m => m.FullName == assembly.FullName) == false)
-                    //    {
-                    //        MyConfig.assemblys.Add(assembly);
-                    //    }
-                    //}
+                    var baseDirectory = AppContext.BaseDirectory;
 
-                    foreach (var file in Directory.EnumerateFiles(location))
+                    var location = Path.Combine(baseDirectory, "modules");
+
+                    if (Directory.Exists(location))
                     {
-                        var assemblyPath = Path.Combine(location, file);
-                        //var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);
-                        var mycon = new AssemblyLoadContext("mycon", true);
-                        //TODO:重复加载问题
-                        using (var fs = new FileStream(assemblyPath, FileMode.Open))
+                        var locationPackage = location + "\\packages";
+                        if (Directory.Exists(locationPackage))
                         {
-                            var assembly = mycon.LoadFromStream(fs);
-                            var assemblyPart = new AssemblyPart(assembly);
-                            apm.ApplicationParts.Add(assemblyPart);
-                            if (MyConfig.assemblys.Exists(m => m.FullName == assembly.FullName) == false)
+                            foreach (var file in Directory.EnumerateFiles(locationPackage))
                             {
-                                MyConfig.assemblys.Add(assembly);
+                                var assemblyPath = Path.Combine(locationPackage, file);
+                                //默认上下文只允许加载一次且不会卸载，解决重复加载问题
+                                using (var fs = new FileStream(assemblyPath, FileMode.Open))
+                                {
+                                    var assembly = AssemblyLoadContext.Default.LoadFromStream(fs);
+                                    var assemblyPart = new AssemblyPart(assembly);
+                                    if (_myAssemblyConfig.assemblyPackages.Exists(m => m.FullName == assembly.FullName) == false)
+                                    {
+                                        apm.ApplicationParts.Add(assemblyPart);
+                                        _myAssemblyConfig.assemblyPackages.Add(assembly);
+                                    }
+                                }
+                            }
+                        }
+                        foreach (var file in Directory.EnumerateFiles(location))
+                        {
+                            var assemblyPath = Path.Combine(location, file);
+                            //LoadFromAssemblyPath，当程序卸载后，无法删除，通过LoadFromStream可以解决此问题
+                            //AssemblyLoadContext.Default默认上下文是无法卸载的，需要新建上下文来解决
+                            //var assembly = AssemblyLoadContext.Default.LoadFromAssemblyPath(assemblyPath);                                            
+                            using (var fs = new FileStream(assemblyPath, FileMode.Open))
+                            {
+                                var mycon = new AssemblyLoadContext(file, true);
+                                var assembly = mycon.LoadFromStream(fs);
+                                var assemblyPart = new AssemblyPart(assembly);
+                                if (_myAssemblyConfig.assemblys.Exists(m => m.FullName == assembly.FullName) == false)
+                                {
+                                    apm.ApplicationParts.Add(assemblyPart);
+                                    _myAssemblyConfig.assemblys.Add(assembly);
+                                }
                             }
                         }
                     }
-                }
-            });
+                });
 
-            MyActionDescriptorChangeProvider.Instance.HasChanged = true;
-            MyActionDescriptorChangeProvider.Instance.TokenSource.Cancel();
-
-            return new string[] { "value1", "value2" };
+                MyActionDescriptorChangeProvider.Instance.HasChanged = true;
+                MyActionDescriptorChangeProvider.Instance.TokenSource.Cancel();
+            }
+            catch (Exception ex)
+            {
+                result = new { code = 403, msg = ex.ToString(), uuid = guid };
+            }
+            return Content(JsonConvert.SerializeObject(result));
         }
 
-        // GET api/<ModuleController>/0
-        [HttpGet("{id}")]
-        public string Get(int id = 0)
+        // GET api/Disabled
+        [HttpGet("Disabled")]
+        public ActionResult Disabled()
         {
+            var guid = Guid.NewGuid().ToString();
+            var result = new { code = 200, msg = "", uuid = guid };
             try
             {
-                Startup.builders.ConfigureApplicationPartManager(apm =>
+                _builders.ConfigureApplicationPartManager(apm =>
                 {
-                    var assembly = MyConfig.assemblys[id];
-                    var assemblyPart = new AssemblyPart(assembly);
-                    AssemblyPart removeAssemblyPart = null;
-                    foreach (AssemblyPart item in apm.ApplicationParts)
+                    var assemblyPartRemove = new List<ApplicationPart>();
+                    var assemblyRemove = new List<Assembly>();
+                    foreach (var assembly in _myAssemblyConfig.assemblys)
                     {
-                        if (item.Assembly.FullName.Equals(assemblyPart.Assembly.FullName))
+                        var assemblyPart = new AssemblyPart(assembly);
+                        foreach (AssemblyPart item in apm.ApplicationParts)
                         {
-                            removeAssemblyPart = item;
-                            break;
+                            if (item.Assembly.FullName.Equals(assemblyPart.Assembly.FullName))
+                            {
+                                assemblyRemove.Add(assembly);
+                                assemblyPartRemove.Add(item);
+                                break;
+                            }
                         }
                     }
-                    if (removeAssemblyPart != null)
+                    foreach (var assemblyPartItem in assemblyPartRemove)
                     {
-                        apm.ApplicationParts.Remove(removeAssemblyPart);
-                        AssemblyLoadContext.GetLoadContext(assembly)?.Unload();
-
-                        MyActionDescriptorChangeProvider.Instance.HasChanged = true;
-                        MyActionDescriptorChangeProvider.Instance.TokenSource.Cancel();
+                        apm.ApplicationParts.Remove(assemblyPartItem);
                     }
+                    foreach (var assemblyItem in assemblyRemove)
+                    {
+                        _myAssemblyConfig.assemblys.Remove(assemblyItem);
+                        AssemblyLoadContext.GetLoadContext(assemblyItem)?.Unload();
+                    }
+                    MyActionDescriptorChangeProvider.Instance.HasChanged = true;
+                    MyActionDescriptorChangeProvider.Instance.TokenSource.Cancel();
                 });
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                result = new { code = 403, msg = ex.ToString(), uuid = guid };
             }
 
-            return "value";
-        }
-
-        // POST api/<ModuleController>
-        [HttpPost]
-        public void Post([FromBody] string value)
-        {
-        }
-
-        // PUT api/<ModuleController>/5
-        [HttpPut("{id}")]
-        public void Put(int id, [FromBody] string value)
-        {
-        }
-
-        // DELETE api/<ModuleController>/5
-        [HttpDelete("{id}")]
-        public void Delete(int id)
-        {
+            return Content(JsonConvert.SerializeObject(result));
         }
     }
 
-
-    public static class MyConfig
+    /// <summary>
+    /// 模块加载配置
+    /// </summary>
+    public class MyAssemblyConfig
     {
-        public static List<Assembly> assemblys = new List<Assembly>();
+        /// <summary>
+        /// 构造函数，初始化加载模块信息
+        /// </summary>
+        public MyAssemblyConfig(IMvcBuilder mvcBuilders)
+        {
+            _mvcbuilders = mvcBuilders;
+            assemblys = new List<Assembly>();
+            assemblyPackages = new List<Assembly>();
+        }
+        public List<Assembly> assemblys { get; set; }
+        public List<Assembly> assemblyPackages { get; set; }
+        private IMvcBuilder _mvcbuilders;
+
+        public IMvcBuilder mvcbuilders
+        {
+            get { return _mvcbuilders; }
+        }
     }
 }

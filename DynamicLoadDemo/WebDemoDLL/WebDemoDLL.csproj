@@ -5,8 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="OrchardCore.Application.Targets" Version="1.0.0-rc2-16299" />
+    <ProjectReference Include="..\FunTest1\FunTest1.csproj" />
   </ItemGroup>
-
 
 </Project>
